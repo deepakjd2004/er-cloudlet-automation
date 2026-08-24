@@ -1,0 +1,25 @@
+name,match_url,match_type,match_value,match_operator,case_sensitive,negate,check_ips,redirect_url,status_code,use_relative_url,use_incoming_query_string,disabled,start,end,matches_always
+# Simple rule  — populate match_url; leave match_type/match_value/match_operator blank
+Shop Old Category,/shop/browse/old-category,,,,,,,/shop/browse/new-category,301,relative_url,false,false,0,0,false
+# Complex rule — populate match_type + match_value + match_operator (equals/contains/exists)
+Shop Sale Path,,path,/shop/sale,equals,false,false,,/shop/specials,301,relative_url,false,false,0,0,false
+# Regex rule   — set match_operator=matches; triggers regex-approval gate (warning only)
+Old Product Slugs,regex,path,^/products/([a-z0-9-]+)/details$,matches,false,false,,/shop/product/$1,301,relative_url,false,false,0,0,false
+# Catch-all    — set matches_always=true; leave match_url and match_type/match_value blank
+# Default Catch-All,,,,,,,,/home,301,relative_url,false,false,0,0,true
+# Loop detection test — forms a cycle with the existing live rule in match-rules.tf:
+#   LIVE:  /shop/browse/international-foods/meal-kits/meal-kits → /shop/browse/international-foods/meal-kits
+#   NEW:   /shop/browse/international-foods/meal-kits            → /shop/browse/international-foods/meal-kits/meal-kits
+Loop Test (real),,path,/shop/browse/international-foods/meal-kits,equals,false,false,,/shop/browse/international-foods/meal-kits/meal-kits,301,relative_url,false,false,0,0,false
+# ── Check 2: Duplicate Source Path ─────────────────────────────────────────────
+# /shop/browse/international-foods/kosher/kosher-foods already exists as a live rule in match-rules.tf
+Duplicate Test,,path,/shop/browse/international-foods/kosher/kosher-foods,equals,false,false,,/shop/browse/international-foods/kosher,301,relative_url,false,false,0,0,false
+# ── Check 3: Source == Target ───────────────────────────────────────────────────
+# Trailing slash is stripped during normalisation so both sides resolve to /shop/same-path
+Same Path Test,/shop/same-path,,,,,,,/shop/same-path/,301,relative_url,false,false,0,0,false
+# ── Check 4: Wildcard * in Path ─────────────────────────────────────────────────
+# Literal * in source_path is not supported by the ER Cloudlet path matcher
+Wildcard Test,/shop/browse/*,,,,,,,/shop/browse/all,301,relative_url,false,false,0,0,false
+# ── Check 5: Root / as Source ───────────────────────────────────────────────────
+# Source resolves to bare / which would redirect every request on the site
+Root Source Test,/,,,,,,,/home,301,relative_url,false,false,0,0,false

@@ -1,0 +1,10 @@
+operation: add # Add | Update | Delete
+regex: true # true | false
+testing-required: true # true | false
+tests:
+  - regex: "^/products/([a-z0-9-]+)/details$"
+    sampleURL: "/products/widget-123/details"
+    redirectURL: "/shop/product/widget-123"
+  - regex: "^/shop/(.*)$"
+    sampleURL: "/shop/sale"
+    redirectURL: "/shop/specials"

@@ -1,0 +1,164 @@
+name,match_url,match_type,match_value,match_operator,case_sensitive,negate,check_ips,redirect_url,status_code,use_relative_url,use_incoming_query_string,disabled,start,end,matches_always,object_match_value
+# ─────────────────────────────────────────────────────────────────────────────
+# End-to-end test CSV — exercises every rule type and optional column.
+#
+# How to use:
+#   1. Back up the live input:   cp rules/simple_rules_pass.csv rules/simple_rules_pass.csv.bak
+#   2. Copy this file into place: cp rules/e2e_test_pass.csv    rules/simple_rules_pass.csv
+#   3. Set operation in input_pipeline_trigger.yaml:  operation: add   regex: true   testing-required: true
+#      (add the matching regex test under `tests:` — sample provided at the bottom of this file as a comment)
+#   4. Dry-run:                   python local_run.py
+#   5. Staging deploy:            python local_run.py --apply-staging
+#   6. Prod deploy:               python local_run.py --apply-staging --apply-prod
+#   7. Restore originals when done:
+#        cp rules/simple_rules_pass.csv.bak rules/simple_rules_pass.csv
+#
+# All source paths use the `/e2e-test/...` prefix so they should not collide
+# with any live rule in match-rules.tf. Names are prefixed `E2E:` so they are
+# easy to spot in the generated HCL and easy to delete later.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEMPLATE ROWS — copy a line below, remove the leading '#', and edit.
+# One ready-to-use example per rule shape + per match_type. See README.md
+# (“Rule type cheat sheet”) for required / optional / forbidden columns.
+# Column order:
+#   name,match_url,match_type,match_value,match_operator,case_sensitive,negate,
+#   check_ips,redirect_url,status_code,use_relative_url,use_incoming_query_string,
+#   disabled,start,end,matches_always,object_match_value
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# # Simple (match_url only)
+# TEMPLATE simple,/old/path,,,,,,,/new/path,301,relative_url,false,false,0,0,false,
+#
+# # Catch-all (matches_always=true)
+# TEMPLATE catchall,,,,,,,,/home,301,relative_url,false,false,0,0,true,
+#
+# # Complex: path
+# TEMPLATE path,,path,/old/path,equals,false,false,,/new/path,301,relative_url,false,false,0,0,false,
+#
+# # Complex: regex (triggers regex approval gate)
+# TEMPLATE regex,,regex,^/old/([a-z0-9-]+)$,equals,false,false,,/new/$1,301,relative_url,false,false,0,0,false,
+#
+# # Complex: extension
+# TEMPLATE extension,,extension,jpg png,equals,false,false,,/images/missing,301,relative_url,false,false,0,0,false,
+#
+# # Complex: hostname
+# TEMPLATE hostname,,hostname,old.example.com,equals,false,false,,https://new.example.com/,301,none,false,false,0,0,false,
+#
+# # Complex: protocol (http|https only)
+# TEMPLATE protocol,,protocol,https,equals,false,false,,/secure-landing,301,relative_url,false,false,0,0,false,
+#
+# # Complex: cookie (flat name=value form)
+# TEMPLATE cookie flat,,cookie,sessionType=guest,equals,false,false,,/guest/home,301,relative_url,false,false,0,0,false,
+#
+# # Complex: cookie (object form — multiple values)
+# TEMPLATE cookie object,,cookie,,equals,false,false,,/member/home,301,relative_url,false,false,0,0,false,object:sessionType:gold|platinum
+#
+# # Complex: query
+# TEMPLATE query,,query,utm_source=oldcampaign,equals,false,false,,/landing,301,relative_url,false,false,0,0,false,
+#
+# # Complex: deviceCharacteristics
+# TEMPLATE deviceCharacteristics,,deviceCharacteristics,accept_third_party_cookie,equals,false,false,,/cookie-required,301,relative_url,false,false,0,0,false,
+#
+# # Complex: countrycode (REQUIRES check_ips)
+# TEMPLATE countrycode,,countrycode,AU NZ,equals,false,false,CONNECTING_IP,/anz/home,301,relative_url,false,false,0,0,false,
+#
+# # Complex: continent (REQUIRES check_ips)
+# TEMPLATE continent,,continent,OC,equals,false,false,CONNECTING_IP,/oc/home,301,relative_url,false,false,0,0,false,
+#
+# # Complex: regioncode (REQUIRES check_ips)
+# TEMPLATE regioncode,,regioncode,NSW VIC,equals,false,false,CONNECTING_IP,/au-east/home,301,relative_url,false,false,0,0,false,
+#
+# # Complex: clientip (flat IP list, REQUIRES check_ips)
+# TEMPLATE clientip,,clientip,1.1.1.1 2.2.2.2/24,equals,false,false,CONNECTING_IP,/restricted,301,relative_url,false,false,0,0,false,
+#
+# # Complex: proxy (REQUIRES check_ips)
+# TEMPLATE proxy,,proxy,anonymous,equals,false,false,CONNECTING_IP,/no-proxy,301,relative_url,false,false,0,0,false,
+#
+# # Complex: header (REQUIRES object_match_value, name goes in the object)
+# TEMPLATE header,,header,,equals,false,false,,/internal/home,301,relative_url,false,false,0,0,false,object:X-My-Header:value1|value2
+#
+# # Complex: method (REQUIRES object_match_value, simple form)
+# TEMPLATE method,,method,,equals,false,false,,/get-only,301,relative_url,false,false,0,0,false,simple:GET|HEAD
+#
+# # Complex: parameter (REQUIRES object_match_value, name goes in the object)
+# TEMPLATE parameter,,parameter,,equals,false,false,,/promo/landing,301,relative_url,false,false,0,0,false,object:promoCode:SUMMER|WINTER
+#
+# # Complex: multi-condition (same name+redirect_url, empty match_url on every row)
+# TEMPLATE multi A,,protocol,https,equals,false,false,,/secure-sale,301,relative_url,false,false,0,0,false,
+# TEMPLATE multi A,,path,/sale,equals,false,false,,/secure-sale,301,relative_url,false,false,0,0,false,
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 1. Simple rule — match_url only ─────────────────────────────────────────
+E2E: Simple Path,/e2e-test/simple-old,,,,,,,/e2e-test/simple-new,301,relative_url,false,false,0,0,false,
+
+# ── 2. Simple rule with absolute redirect_url + 302 + query-string preserved
+E2E: Simple Absolute Redirect,/e2e-test/external,,,,,,,https://example.com/landing,302,none,true,false,0,0,false,
+
+# ── 3. Complex rule — single path condition (equals) ────────────────────────
+E2E: Complex Path Equals,,path,/e2e-test/complex-equals,equals,false,false,,/e2e-test/complex-equals-new,301,relative_url,false,false,0,0,false,
+
+# ── 4. Complex rule — path contains ─────────────────────────────────────────
+E2E: Complex Path Contains,,path,/e2e-test/contains,contains,false,false,,/e2e-test/contains-target,301,relative_url,false,false,0,0,false,
+
+# ── 5. Complex rule — negate + case_sensitive ───────────────────────────────
+E2E: Complex Negate CaseSensitive,,path,/e2e-test/Case-Sensitive,equals,true,true,,/e2e-test/default-target,301,relative_url,false,false,0,0,false,
+
+# ── 6. Complex rule — MULTI-MATCH (protocol = https AND path) ───────────────
+# Two CSV rows, same name + redirect_url, empty match_url → one rule, two matches{} blocks.
+E2E: Complex Multi Match,,protocol,https,equals,false,false,,/e2e-test/multi-match-new,301,relative_url,false,false,0,0,false,
+E2E: Complex Multi Match,,path,/e2e-test/multi-match-old,equals,false,false,,/e2e-test/multi-match-new,301,relative_url,false,false,0,0,false,
+
+# ── 7. Complex rule — MULTI-MATCH (method via object_match_value AND path) ──
+# Demonstrates object_match_value column with the `simple:V1|V2` form.
+# The Akamai schema requires object_match_value for `method` (and a few others).
+E2E: Complex Multi Three,,method,,equals,false,false,,/e2e-test/three-conditions-new,301,relative_url,false,false,0,0,false,simple:GET|POST
+E2E: Complex Multi Three,,path,/e2e-test/three-conditions-old,equals,false,false,,/e2e-test/three-conditions-new,301,relative_url,false,false,0,0,false,
+
+# ── 8. IP-based complex rule ────────────────────────────────────────────────
+# clientip rules use a FLAT match_value with space-separated IPs/CIDRs.
+# This is the working form per live deploys; object_match_value is NOT accepted
+# by the Cloudlets v3 API for clientip.
+E2E: Complex IP Match,,clientip,1.1.1.1 2.2.2.2,equals,false,false,CONNECTING_IP,/e2e-test/internal-only,302,relative_url,false,false,0,0,false,
+
+# ── 9. Header-based complex rule — object form requires NAME ────────────────
+# `object:NAME:V1|V2` → object_match_value { type="object" name="X-E2E-Test" options { value=[...] } }
+E2E: Complex Header,,header,,equals,false,false,,/e2e-test/header-target,301,relative_url,false,false,0,0,false,object:X-E2E-Test:test-value
+
+# ── 10. Regex rule — uses match_type=regex (NOT match_operator=matches) ────
+# Per the ER schema, valid match_operators are equals|contains|exists ONLY.
+# Regex matching is expressed as match_type=regex with the pattern in match_value.
+# Triggers Stage 2 regex tests + the regex approval gate.
+# IMPORTANT: add the matching test to input_pipeline_trigger.yaml — see comment
+# block at EOF.
+E2E: Regex Product Slugs,,regex,^/e2e-test/products/([a-z0-9-]+)/details$,equals,false,false,,/e2e-test/shop/product/$1,301,relative_url,false,false,0,0,false,
+
+# ── 11. Disabled rule — pushed but inactive on Akamai ───────────────────────
+E2E: Disabled Rule,/e2e-test/disabled-source,,,,,,,/e2e-test/disabled-target,301,relative_url,false,true,0,0,false,
+
+# ── 12. Time-bounded rule — start/end epoch seconds (sample: now → +1 year) ─
+# start = 2026-06-02 00:00:00 UTC ; end = 2027-06-02 00:00:00 UTC
+E2E: Time Bounded Rule,/e2e-test/time-bounded-old,,,,,,,/e2e-test/time-bounded-new,301,relative_url,false,false,1748822400,1780358400,false,
+
+# ── 13. Catch-all rule — matches_always=true; should be the LAST rule ───────
+# Commented out by default: a catch-all on a live policy will redirect every request.
+# Enable only when you are intentionally testing catch-all behaviour on a throw-away policy.
+# E2E: Catch All Default,,,,,,,,/e2e-test/home,301,relative_url,false,false,0,0,true,
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Companion `input_pipeline_trigger.yaml` block (paste this in before running):
+#
+#   operation: add
+#   regex: true
+#   testing-required: true
+#   tests:
+#     - regex: "^/e2e-test/products/([a-z0-9-]+)/details$"
+#       sampleURL: "/e2e-test/products/widget-123/details"
+#       redirectURL: "/e2e-test/shop/product/widget-123"
+#
+# To tear down after testing:
+#   1. operation: delete   (in input_pipeline_trigger.yaml)
+#   2. keep this same CSV in place
+#   3. python local_run.py --apply-staging --apply-prod
+# ─────────────────────────────────────────────────────────────────────────────

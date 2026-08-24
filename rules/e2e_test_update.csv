@@ -1,0 +1,84 @@
+name,match_url,match_type,match_value,match_operator,case_sensitive,negate,check_ips,redirect_url,status_code,use_relative_url,use_incoming_query_string,disabled,start,end,matches_always,object_match_value
+# ─────────────────────────────────────────────────────────────────────────────
+# E2E UPDATE test CSV — mutates rules previously added by e2e_test_pass.csv.
+#
+# How to use:
+#   0. Make sure e2e_test_pass.csv has already been deployed (the rules below
+#      MUST exist in match-rules.tf). If not:
+#        cp rules/e2e_test_pass.csv rules/simple_rules_pass.csv
+#        # set operation: add in input_pipeline_trigger.yaml, then
+#        python local_run.py --apply-staging --apply-prod
+#
+#   1. Back up the live input:   cp rules/simple_rules_pass.csv rules/simple_rules_pass.csv.bak
+#   2. Copy this file into place: cp rules/e2e_test_update.csv  rules/simple_rules_pass.csv
+#   3. Set operation in input_pipeline_trigger.yaml:
+#        operation: update
+#        regex: true
+#        testing-required: true
+#        tests:
+#          - regex: "^/e2e-test/products/([a-z0-9-]+)/details$"
+#            sampleURL: "/e2e-test/products/widget-123/details"
+#            redirectURL: "/e2e-test/shop/product-v2/widget-123"
+#   4. Dry-run:            python local_run.py
+#   5. Staging deploy:     python local_run.py --apply-staging
+#   6. Prod deploy:        python local_run.py --apply-staging --apply-prod
+#   7. Restore originals:  cp rules/simple_rules_pass.csv.bak rules/simple_rules_pass.csv
+#
+# RULE IDENTITY (do NOT change between add and update):
+#   • Simple rules:  (name, match_url)
+#   • Complex rules: (name, [(match_type, match_value, match_operator), ...])
+#
+# What this CSV mutates (everything OUTSIDE the identity key):
+#   • redirect_url           old `/...-new` → new `/...-v2`
+#   • status_code            301 → 308 on a couple of rows (permanent variant)
+#   • use_relative_url       toggled where useful
+#   • use_incoming_query_string  toggled
+#   • disabled               flips Rule 11 from disabled=true → false (re-enable)
+#   • start / end            Rule 12 time window narrowed
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── 1. Simple — change redirect_url + bump to 308 ───────────────────────────
+E2E: Simple Path,/e2e-test/simple-old,,,,,,,/e2e-test/simple-v2,308,relative_url,false,false,0,0,false,
+
+# ── 2. Simple absolute redirect — change destination + drop query-string ────
+E2E: Simple Absolute Redirect,/e2e-test/external,,,,,,,https://example.com/landing-v2,302,none,false,false,0,0,false,
+
+# ── 3. Complex path equals — new destination ────────────────────────────────
+E2E: Complex Path Equals,,path,/e2e-test/complex-equals,equals,false,false,,/e2e-test/complex-equals-v2,308,relative_url,false,false,0,0,false,
+
+# ── 4. Complex path contains — new destination + query-string preserve ON ──
+E2E: Complex Path Contains,,path,/e2e-test/contains,contains,false,false,,/e2e-test/contains-target-v2,301,relative_url,true,false,0,0,false,
+
+# ── 5. Complex negate + case_sensitive — same identity, new target ─────────
+# (case_sensitive/negate must stay identical — they bind the matches{} shape.)
+E2E: Complex Negate CaseSensitive,,path,/e2e-test/Case-Sensitive,equals,true,true,,/e2e-test/default-target-v2,302,relative_url,false,false,0,0,false,
+
+# ── 6. Complex multi-match (protocol AND path) — new shared destination ────
+# All continuation rows must share the same name + redirect_url + identity tuple.
+E2E: Complex Multi Match,,protocol,https,equals,false,false,,/e2e-test/multi-match-v2,301,relative_url,false,false,0,0,false,
+E2E: Complex Multi Match,,path,/e2e-test/multi-match-old,equals,false,false,,/e2e-test/multi-match-v2,301,relative_url,false,false,0,0,false,
+
+# ── 7. Complex multi-match (method via omv AND path) — new target ──────────
+E2E: Complex Multi Three,,method,,equals,false,false,,/e2e-test/three-conditions-v2,301,relative_url,false,false,0,0,false,simple:GET|POST
+E2E: Complex Multi Three,,path,/e2e-test/three-conditions-old,equals,false,false,,/e2e-test/three-conditions-v2,301,relative_url,false,false,0,0,false,
+
+# ── 8. clientip rule — flat match_value, change destination + check_ips ────
+# IP list must stay byte-identical (it's part of the identity tuple).
+E2E: Complex IP Match,,clientip,1.1.1.1 2.2.2.2,equals,false,false,CONNECTING_IP,/e2e-test/internal-only-v2,302,relative_url,false,false,0,0,false,
+
+# ── 9. Header rule — new destination, same header name + values ────────────
+E2E: Complex Header,,header,,equals,false,false,,/e2e-test/header-target-v2,301,relative_url,false,false,0,0,false,object:X-E2E-Test:test-value
+
+# ── 10. Regex rule — change destination template; pattern must stay identical
+# Triggers Stage 2 regex test (matching test pinned in the header comment above).
+E2E: Regex Product Slugs,,regex,^/e2e-test/products/([a-z0-9-]+)/details$,equals,false,false,,/e2e-test/shop/product-v2/$1,301,relative_url,false,false,0,0,false,
+
+# ── 11. Disabled rule — RE-ENABLE (disabled=true → false) ──────────────────
+E2E: Disabled Rule,/e2e-test/disabled-source,,,,,,,/e2e-test/disabled-target-v2,301,relative_url,false,false,0,0,false,
+
+# ── 12. Time-bounded rule — narrow window (1 year → 6 months) + new target ─
+# start = 2026-06-02 00:00:00 UTC ; end = 2026-12-02 00:00:00 UTC
+E2E: Time Bounded Rule,/e2e-test/time-bounded-old,,,,,,,/e2e-test/time-bounded-v2,302,relative_url,false,false,1748822400,1764633600,false,
+
+# ── 13. Catch-all — commented out (mirror of the add CSV) ──────────────────
+# E2E: Catch All Default,,,,,,,,/e2e-test/home-v2,301,relative_url,false,false,0,0,true,
