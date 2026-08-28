@@ -1,3 +1,4 @@
+# Use Akamai Terraform CLI to generate this file for existing cloudlet policy.
 terraform {
   required_providers {
     akamai = {
@@ -17,7 +18,7 @@ resource "akamai_cloudlets_policy" "policy" {
   name          = "Test_DJ_ERedirect" # Replace with your desired policy name
   cloudlet_code = "ER"
   description   = "Test (Based on v2) "
-  group_id      = "178772" # Replace with your group ID
+  group_id      = "12345" # Replace with your group ID
   match_rules   = data.akamai_cloudlets_edge_redirector_match_rule.match_rules_er.json
   is_shared     = true
 }
